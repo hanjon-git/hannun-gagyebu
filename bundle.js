@@ -2130,7 +2130,7 @@ function safeJson_(x) {
 
 
 ;// ===== 버전.js =====
-const HN_BUILD = 9;   // 출시 때 release_prep가 올림. 직접 고치지 말 것
+const HN_BUILD = 10;   // 출시 때 release_prep가 올림. 직접 고치지 말 것
 
 
 ;// ===== 보관.js =====
