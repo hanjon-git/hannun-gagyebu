@@ -1,0 +1,82 @@
+# 한눈가계부 원격 승인 서명 (2026-11-19). 출시 도구(hn.js sale request)가 요청 브랜치 req-bN을 만들고 이 작업을 실행함.
+# show: 요청 확인·요약(승인 전) → sign: 환경 'release' 승인 뒤에만 키(CODE_KEY·CODE_KEY_PASS)를 써서 서명 → 게시(main·태그) 또는 시험(요청 브랜치에 서명본만)
+name: sign
+run-name: "서명 build ${{ inputs.build }} · ${{ inputs.sha12 }} · ${{ inputs.dry == 'true' && '시험' || '게시' }}"
+on:
+  workflow_dispatch:
+    inputs:
+      build: { description: '빌드 번호', required: true, type: string }
+      sha12: { description: '번들 sha256 앞 12자', required: true, type: string }
+      req: { description: '요청 브랜치 (req-bN)', required: true, type: string }
+      dry: { description: '시험이면 true (게시 안 함)', required: false, type: string, default: 'false' }
+permissions:
+  contents: write
+concurrency:
+  group: sign
+  cancel-in-progress: false
+jobs:
+  show:
+    runs-on: ubuntu-latest
+    env:
+      IN_BUILD: ${{ inputs.build }}
+      IN_SHA12: ${{ inputs.sha12 }}
+      IN_REQ: ${{ inputs.req }}
+      IN_DRY: ${{ inputs.dry }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main, fetch-depth: 1 }
+      - name: 요청 받기
+        run: |
+          [[ "$IN_REQ" =~ ^req-b[0-9]+$ ]] || { echo "::error::요청 브랜치 이름이 형식과 다름"; exit 1; }
+          git fetch -q --depth 1 origin "refs/heads/$IN_REQ"
+          git checkout FETCH_HEAD -- req
+      - name: 확인
+        run: node .github/sign/sign.cjs check
+  sign:
+    needs: show
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      IN_BUILD: ${{ inputs.build }}
+      IN_SHA12: ${{ inputs.sha12 }}
+      IN_REQ: ${{ inputs.req }}
+      IN_DRY: ${{ inputs.dry }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main, fetch-depth: 1 }
+      - name: 요청 받기
+        run: |
+          [[ "$IN_REQ" =~ ^req-b[0-9]+$ ]] || { echo "::error::요청 브랜치 이름이 형식과 다름"; exit 1; }
+          git fetch -q --depth 1 origin "refs/heads/$IN_REQ"
+          git checkout FETCH_HEAD -- req
+      - name: 서명
+        env:
+          CODE_KEY: ${{ secrets.CODE_KEY }}
+          CODE_KEY_PASS: ${{ secrets.CODE_KEY_PASS }}
+        run: node .github/sign/sign.cjs sign
+      - name: 게시 또는 시험 결과 저장
+        run: |
+          git config user.name "한눈가계부"
+          git config user.email "290286726+313jongmin-droid@users.noreply.github.com"
+          cp index.json "$RUNNER_TEMP/index.signed.json"
+          if [ "$IN_DRY" = "true" ]; then
+            git reset -q --hard
+            git fetch -q --depth 1 origin "refs/heads/$IN_REQ"
+            git checkout -q -B work FETCH_HEAD
+            cp "$RUNNER_TEMP/index.signed.json" req/index.signed.json
+            git add req/index.signed.json
+            git commit -q -m "시험 서명 build $IN_BUILD"
+            git push -q origin "HEAD:refs/heads/$IN_REQ"
+            echo "시험 서명 완료 (게시 안 함)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            git restore -q --staged req; rm -rf req
+            git add bundle.js index.json
+            if [ -f rules.json ]; then git add rules.json; fi
+            git commit -q -m "build $IN_BUILD"
+            git push -q origin HEAD:main
+            git tag -f "b$IN_BUILD"
+            git push -q -f origin "refs/tags/b$IN_BUILD"
+            git push -q origin --delete "$IN_REQ" || true
+            curl -s -o /dev/null "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@main/index.json" || true
+            echo "게시 완료: build $IN_BUILD → main $(git rev-parse --short HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          fi
