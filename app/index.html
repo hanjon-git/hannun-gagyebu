@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>한눈가계부 알림 연결</title>
+<!-- 한눈가계부 알림 앱 연결 중계 화면 (2026-11-19 설치 간편화 C). 시트 창의 '알림 앱 연결' QR = 이 주소 + '#' + noticollector://setup?… 
+     '#' 뒤는 서버로 가지 않음. 폰 크롬은 사람이 누를 때만 앱 링크를 열어서 단추를 둠. 외부 파일·통계 없음 -->
+<style>
+  html,body{margin:0;height:100%;background:#fff;color:#191F28;font:15px -apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+  .c{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;text-align:center;gap:14px}
+  .ic{width:64px;height:64px;border-radius:16px;background:#1F3864;color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800}
+  .t{font-size:18px;font-weight:800}
+  a.btn{display:block;width:100%;max-width:340px;padding:14px;border-radius:12px;background:#1F3864;color:#fff;font-weight:700;font-size:16px;text-decoration:none}
+  .s{color:#6B7684;font-size:13px;line-height:1.6}.s a{color:#1C7ED6}
+  .bad{color:#E03131;font-weight:700}
+</style>
+</head>
+<body>
+<div class="c">
+  <div class="ic">한</div>
+  <div class="t">한눈가계부 알림 연결</div>
+  <a class="btn" id="go" href="#">앱에서 열기</a>
+  <div class="s" id="s">앱이 열리면 '확인'을 누르면 끝</div>
+</div>
+<script>
+  (function () {
+    var link = location.hash.slice(1);   // 그대로 씀 (u= 값은 인코딩된 채여야 앱이 읽음)
+    var go = document.getElementById('go'), s = document.getElementById('s');
+    if (!/^noticollector:\/\/setup\?u=https%3A%2F%2Fscript\.google\.com%2Fmacros%2Fs%2F[\w-]+%2Fexec&t=[0-9a-f]{32}$/.test(link)) {
+      go.style.display = 'none'; s.innerHTML = '<span class="bad">연결 글이 맞지 않음</span><br>시트 메뉴 가계부 → 관리 → 대시보드 주소 · 연결코드에서 QR을 다시 찍으세요';
+      return;
+    }
+    go.href = link;
+    var t = 0;
+    go.onclick = function () { clearTimeout(t); t = setTimeout(function () { if (!document.hidden) s.innerHTML = '앱이 안 열리면 먼저 설치: <a href="https://play.google.com/apps/testing/hannun.noticollector">테스트 참여 링크</a>'; }, 1800); };
+    history.replaceState(null, '', location.pathname);   // 연결 글을 주소창·기록에서 지움 (단추에는 남음)
+  })();
+</script>
+</body>
+</html>
