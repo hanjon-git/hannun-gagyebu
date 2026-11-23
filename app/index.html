@@ -1,43 +1,116 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
-<title>한눈가계부 알림 연결</title>
-<!-- 한눈가계부 알림 앱 연결 중계 화면 (2026-11-19 설치 간편화 C). 시트 창의 '알림 앱 연결' QR = 이 주소 + '#' + noticollector://setup?… 
-     '#' 뒤는 서버로 가지 않음. 폰 크롬은 사람이 누를 때만 앱 링크를 열어서 단추를 둠. 외부 파일·통계 없음 -->
+<title>한눈가계부 · 카드 기록</title>
 <style>
-  html,body{margin:0;height:100%;background:#fff;color:#191F28;font:15px -apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
-  .c{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;text-align:center;gap:14px}
-  .ic{width:64px;height:64px;border-radius:16px;background:#1F3864;color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800}
-  .t{font-size:18px;font-weight:800}
-  a.btn{display:block;width:100%;max-width:340px;padding:14px;border-radius:12px;background:#1F3864;color:#fff;font-weight:700;font-size:16px;text-decoration:none}
-  .s{color:#6B7684;font-size:13px;line-height:1.6}.s a{color:#1C7ED6}
-  .bad{color:#E03131;font-weight:700}
+*{box-sizing:border-box}body{margin:0;background:#f5f7fa;color:#191f28;font:16px/1.55 -apple-system,"Malgun Gothic",sans-serif}main{max-width:480px;margin:8vh auto;padding:26px;background:white;border-radius:18px}h1{font-size:24px;margin:0 0 12px}p{margin:10px 0}small{color:#54606e}button,.btn{display:block;width:100%;margin:12px 0;padding:12px;border:0;border-radius:10px;background:#1f3864;color:white;text-align:center;font:inherit;font-weight:bold;text-decoration:none;cursor:pointer}button:disabled{opacity:.55}textarea,input{width:100%;padding:10px;border:1px solid #b6bfca;border-radius:8px;font:inherit}details{margin-top:16px}summary{cursor:pointer}a{color:#174b83}#status{font-weight:600} [hidden]{display:none!important}@media(max-width:510px){main{margin:0;min-height:100vh;padding:28px 20px}}
 </style>
 </head>
-<body>
-<div class="c">
-  <div class="ic">한</div>
-  <div class="t">한눈가계부 알림 연결</div>
-  <a class="btn" id="go" href="#">앱에서 열기</a>
-  <div class="s" id="s">앱이 열리면 '확인'을 누르면 끝</div>
-</div>
+<body><main>
+<h1 id="heading">아이폰 카드 기록</h1>
+<section id="intro">
+<p>PC에서 내 가계부를 열고 <b>가계부 → 관리 → 대시보드 주소 · 연결코드</b>를 누르세요. 아이폰 카메라로 <b>알림 앱 연결</b> QR을 찍으면 이 화면이 내 시트와 연결됩니다.</p>
+<p><a href="https://github.com/hanjon-git/hannun-gagyebu/blob/main/INSTALL.md#4-웹앱-배포">웹앱 주소를 처음 만드는 방법</a></p>
+<details><summary>QR 대신 내 연결코드 붙여넣기</summary>
+<p><label for="code">같은 시트 창의 ‘직접 붙여넣기 → 알림 앱 연결’ 코드를 복사하세요.</label></p>
+<input id="code" type="password" autocomplete="off" spellcheck="false"><button id="connect">이 가계부 연결</button></details>
+</section>
+<section id="android" hidden>
+<a class="btn" id="go">알림 앱에서 열기</a>
+<p>앱에서 연결을 확인하세요. 처음이라면 <a href="https://groups.google.com/g/hannun-buyers">테스트 그룹 가입</a> 후 <a href="https://play.google.com/apps/testing/hannun.noticollector">안드로이드 앱을 설치</a>하세요.</p>
+</section>
+<section id="iphone" hidden>
+<label for="card"><b>카드 승인·취소 문구</b></label>
+<p><small>문자나 카드 앱에서 복사한 결제 문구를 붙여넣으세요. 이 탭을 닫으면 다시 QR로 연결해야 합니다.</small></p>
+<textarea id="card" rows="4" maxlength="2000" placeholder="예) 한눈카드 승인 12,000원 한눈상점" autocomplete="off"></textarea>
+<button id="send">내 시트에 기록</button>
+<button id="probe">거래 없이 연결 확인</button>
+<div id="native" hidden><hr><button id="copy">① 단축어용 연결코드 복사</button><textarea id="manual" aria-label="직접 복사할 연결코드" readonly hidden></textarea>
+<a class="btn" id="install" rel="noreferrer">② 아이폰 단축어 추가</a><small>추가할 때 복사한 코드를 붙여넣으세요. 이후에는 텍스트 공유 메뉴에서 바로 보낼 수 있어요.</small></div>
+</section>
+<p id="status" role="status" aria-live="polite"></p>
+</main>
 <script>
-  (function () {
-    var link = location.hash.slice(1);   // 그대로 씀 (u= 값은 인코딩된 채여야 앱이 읽음)
-    var go = document.getElementById('go'), s = document.getElementById('s');
-    if (!/^noticollector:\/\/setup\?u=https%3A%2F%2Fscript\.google\.com%2Fmacros%2Fs%2F[\w-]+%2Fexec&t=[0-9a-f]{32}$/.test(link)) {
-      go.style.display = 'none'; s.innerHTML = '<span class="bad">연결 글이 맞지 않음</span><br>시트 메뉴 가계부 → 관리 → 대시보드 주소 · 연결코드에서 QR을 다시 찍으세요';
-      return;
+'use strict';
+// 실제 아이폰에서 설치·기록을 확인한 공용 iCloud 링크만 여기에 넣는다.
+const shortcutURL = '';
+const byId = id => document.getElementById(id);
+const setupPattern = /^noticollector:\/\/setup\?u=https%3A%2F%2Fscript\.google\.com%2Fmacros%2Fs%2F([\w-]+)%2Fexec&t=([0-9a-f]{32})$/;
+let destination, token, setupCode;
+function message(text) { byId('status').textContent = text; }
+function connect(value) {
+  const code = value.trim().replace(/^https:\/\/hanjon-git\.github\.io\/hannun-gagyebu\/app\/#/, '');
+  const match = setupPattern.exec(code);
+  if (!match) { message('연결코드를 확인하거나 내 가계부의 알림 앱 연결 QR을 다시 찍어 주세요.'); return; }
+  setupCode = code;
+  destination = 'https://script.google.com/macros/s/' + match[1] + '/exec';
+  token = match[2];
+  byId('code').value = '';
+  byId('intro').hidden = true;
+  message('');
+  if (/Android/i.test(navigator.userAgent)) {
+    byId('heading').textContent = '안드로이드 알림 연결';
+    byId('go').href = code;
+    byId('android').hidden = false;
+    return;
+  }
+  byId('iphone').hidden = false;
+  if (/^https:\/\/www\.icloud\.com\/shortcuts\/[a-f0-9]{32}$/i.test(shortcutURL)) {
+    byId('install').href = shortcutURL;
+    byId('native').hidden = false;
+  }
+}
+function validCard(text) {
+  const denied = /^\s*=|[\[(]\s*광고\s*[\])]|인증|비밀\s*번호|보안\s*(?:번호|코드)|본인\s*확인|일회용|OTP|verification\s*code|one.time\s*(?:password|code)|거절|승인\s*거부|한도\s*초과|결제\s*예정|청구\s*(?:금액|예정|안내)|납부\s*(?:예정|안내)|명세서|사용\s*가능\s*한도/i;
+  return text.length <= 2000 && !denied.test(text) && /[0-9][0-9,]*\s*원/.test(text) && /승인|결제|사용|취소|체크출금/.test(text);
+}
+async function submit(probe) {
+  if (byId('send').disabled || !destination) return;
+  const input = byId('card');
+  const text = probe ? '(광고) 한눈가계부 연결 확인' : input.value.trim();
+  if (!probe && !validCard(text)) { message('승인·취소 내용과 원화 금액이 있는 결제 문구를 확인해 주세요. 인증·청구 안내는 보낼 수 없어요.'); return; }
+  byId('send').disabled = byId('probe').disabled = true;
+  input.readOnly = true;
+  message(probe ? '연결 확인 중…' : '기록 중…');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(destination, { method:'POST', credentials:'omit', referrerPolicy:'no-referrer', signal:controller.signal,
+      headers:{'Content-Type':'text/plain;charset=UTF-8'}, body:JSON.stringify({token,app:'iPhone',title:'',text}) });
+    if (!response.ok) throw new Error();
+    const result = await response.json();
+    if (result.ok !== true) {
+      message(result.error === 'token' ? '연결코드가 만료됐거나 달라졌습니다. 내 시트의 QR을 다시 찍으세요.' : '시트가 기록을 확인하지 못했습니다. 내역을 확인해 주세요.');
+    } else if (probe) {
+      message(result.skipped === 'ad' ? '내 가계부에 연결됐어요. 거래는 추가되지 않았습니다.' : '연결 확인 결과를 확인할 수 없습니다. 시트 내역을 확인해 주세요.');
+    } else if (result.dup === true || result.skipped === 'ad' || Object.keys(result).length === 1) {
+      input.value = '';
+      message(result.dup ? '이미 기록한 문구입니다.' : result.skipped ? '광고 안내는 기록하지 않았습니다.' : '내 가계부에 기록했습니다.');
+    } else {
+      message('시트 응답을 확인해 주세요. 다시 보내기 전에 내역을 확인하세요.');
     }
-    go.href = link;
-    var t = 0;
-    go.onclick = function () { clearTimeout(t); t = setTimeout(function () { if (!document.hidden) s.innerHTML = '앱이 안 열리면 먼저 설치: <a href="https://play.google.com/apps/testing/hannun.noticollector">테스트 참여 링크</a>'; }, 1800); };
-    history.replaceState(null, '', location.pathname);   // 연결 글을 주소창·기록에서 지움 (단추에는 남음)
-  })();
-</script>
-</body>
-</html>
+  } catch {
+    message(probe ? '연결을 확인하지 못했습니다. Safari에서 다시 열고 웹앱 배포 설정을 확인해 주세요.' : '저장 여부를 확인하지 못했습니다. 다시 보내기 전에 시트 내역을 확인해 주세요.');
+  } finally {
+    clearTimeout(timer);
+    input.readOnly = false;
+    byId('send').disabled = byId('probe').disabled = false;
+  }
+}
+byId('connect').onclick = () => connect(byId('code').value);
+byId('send').onclick = () => submit(false);
+byId('probe').onclick = () => submit(true);
+byId('copy').onclick = async () => {
+  try { await navigator.clipboard.writeText(setupCode); message('복사했습니다. 단축어를 추가하고 붙여넣으세요.'); }
+  catch { const manual = byId('manual'); manual.hidden = false; manual.value = setupCode; manual.focus(); manual.select(); message('선택된 코드를 복사해 주세요.'); }
+};
+if (location.hash) {
+  const value = location.hash.slice(1);
+  history.replaceState(null, '', location.pathname);
+  connect(value);
+}
+</script></body></html>
